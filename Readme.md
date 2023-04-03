@@ -19,4 +19,12 @@ You should return:
 cargo test
 ```
 ## Example:
-![](static/example_test.png)
+![](static/fix_panic.png)
+
+
+
+##  Update:
+
+```
+My previous version could have ended incorrectly if an incoming short causes panic. Now, if the function f causes a panic, catch_unwind will intercept it and return Err. We use the ok() method to convert Result<R, Box<din std::any::Any + Send>> to Option<R>, where None means that a panic has occurred. Thus, instead of an emergency termination of the thread, the returned result will be None for the elements on which the panic occurred.
+```
