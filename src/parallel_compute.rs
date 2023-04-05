@@ -2,44 +2,43 @@ use std::thread;
 use std::sync::Arc;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
-const THERESHOLD : usize = 9;
-pub fn parallel_compute<T, R, F>(input: Vec<T>, f: F) -> Vec<Option<R>>
+const THRESHOLD : usize = 9;
+fn process_chunk<T, F>(chunk: &[T], f: F) -> Vec<Option<T>>
 where
-    T: Send + 'static + std::clone::Clone,
-    R: Send + 'static,
-    F: Fn(T) -> R + Send + Sync + 'static,
-    {
-    let input_len = input.len();
+    T: Send + 'static,
+    F: Fn(&T) -> T + Send + Sync + 'static,
+{
+    chunk
+    .into_iter()
+    .map(|t| catch_unwind(AssertUnwindSafe(|| f(t))).ok())
+    .collect::<Vec<Option<T>>>()
+}
 
-    if input_len <= THERESHOLD {
-        return input.into_iter().map(|t| Some(f(t))).collect();
+pub fn parallel_compute<T, F>(input: Vec<T>, f: F) -> Vec<Option<T>>
+where
+    T: Send + Sync + 'static + Clone,
+    F: Fn(&T) -> T + Send + Sync + 'static + Clone,
+{
+    if input.len() < THRESHOLD {
+        return input.iter().map(|x| Some(f(x))).collect();
     }
-
     let num_threads = 4;
-    let chunk_size = (input_len + num_threads - 1) / num_threads;
-    let f = Arc::new(f);
+    let chunk_size = (input.len() + num_threads - 1) / num_threads;
+    
+    let input = Arc::new(input);
+    let mut handles = vec![];
 
-    let mut handles = Vec::with_capacity(num_threads);
-
-    for chunk in input.chunks(chunk_size) {
-        let f = f.clone();
+    input.chunks(chunk_size).for_each(|chunk| {
         let chunk = chunk.to_vec();
+        let f = f.clone();
         let handle = thread::spawn(move || {
-            chunk
-                .into_iter()
-                .map(|t| catch_unwind(AssertUnwindSafe(|| f(t))).ok())
-                .collect::<Vec<Option<R>>>()
+            process_chunk(&chunk, move |x| f(x))
         });
         handles.push(handle);
-    }
-
-    let mut results = Vec::with_capacity(input_len);
-
+    });
+    let mut results = vec![];
     for handle in handles {
         results.extend(handle.join().unwrap());
     }
     results
 }
-
-
-

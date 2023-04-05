@@ -6,7 +6,7 @@ mod tests {
     fn add_two() {
         let vector: Vec<i32> = vec![1, 2, 3, 4, 5];
         let expected: Vec<Option<i32>> = vec![Some(3), Some(4), Some(5), Some(6), Some(7)];
-        let func = |x: i32| x + 2;
+        let func = |x: &i32| x + 2;
         assert_eq!(expected, parallel_compute::parallel_compute(vector, func));
     }
     
@@ -27,7 +27,7 @@ mod tests {
             Some(-400),
             Some(112),
         ];
-        let func = |x: i32| x * 2;
+        let func = |x: &i32| x * 2;
         assert_eq!(expected, parallel_compute::parallel_compute(vector, func));
     }
     #[test]
@@ -60,20 +60,20 @@ mod tests {
             Some(String::from("I like Canada")),
             Some(String::from("I like Chili")),
         ];
-        let func = |text: String| -> String { format!("I like {}", text) };
+        let func = |text: &String| -> String { format!("I like {}", text) };
         assert_eq!(expected, parallel_compute::parallel_compute(vector, func));
     }
     #[test]
     fn test_empty_input() {
         let input: Vec<i32> = Vec::new();
-        let result: Vec<Option<i32>> = parallel_compute::parallel_compute(input, |n: i32| n * n);
+        let result: Vec<Option<i32>> = parallel_compute::parallel_compute(input, |n: &i32| n * n);
         assert_eq!(result, Vec::<Option<i32>>::new());
     }
     
     #[test]
     fn test_small_input() {
         let input = vec![1, 2, 3, 4];
-        let result = parallel_compute::parallel_compute(input.clone(), |n: i32| n * n);
+        let result = parallel_compute::parallel_compute(input.clone(), |n: &i32| n * n);
         let expected = input.into_iter().map(|n: i32| Some(n * n)).collect::<Vec<Option<i32>>>();
         assert_eq!(result, expected);
     }
@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn test_large_input() {
         let input = (1..=20).collect::<Vec<i32>>();
-        let result = parallel_compute::parallel_compute(input.clone(), |n: i32| n * n);
+        let result = parallel_compute::parallel_compute(input.clone(), |n: &i32| n * n);
         let expected = input.into_iter().map(|n: i32| Some(n * n)).collect::<Vec<Option<i32>>>();
         assert_eq!(result, expected);
     }
@@ -93,8 +93,9 @@ mod tests {
     #[test]
     fn test_small_input_str() {
         let input = vec!["a", "b", "c", "d"];
-        let result = parallel_compute::parallel_compute(input.clone(), |s| concat(&s));
-        let expected = input.into_iter().map(|s| Some(concat(&s))).collect::<Vec<Option<String>>>();
+        let input_str = input.iter().map(|c| c.to_string()).collect::<Vec<String>>();
+        let result = parallel_compute::parallel_compute(input_str.clone(), |s| concat(&s));
+        let expected = input_str.into_iter().map(|s| Some(concat(&s))).collect::<Vec<Option<String>>>();
         assert_eq!(result, expected);
     }
     
@@ -108,15 +109,16 @@ mod tests {
     }
 
     
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Copy, Clone, Debug, PartialEq)]
     struct Point {
         x: f64,
         y: f64,
     }
     
     impl Point {
-        fn distance_from_origin(&self) -> f64 {
-            (self.x.powi(2) + self.y.powi(2)).sqrt()
+        fn distance_from_origin(&self) -> Point {
+            self.x.powi(2);
+            return *self;
         }
     }
     
@@ -142,11 +144,12 @@ mod tests {
             Point { x: 99.0, y: 777.0 },
             Point { x: 111.0, y: 66.0 },
             ];
-            let result = parallel_compute::parallel_compute(input_points.clone(), |p| p.distance_from_origin());
+            let result = parallel_compute::parallel_compute(input_points.clone(), 
+            |p| p.distance_from_origin());
             let expected = input_points
             .into_iter()
             .map(|p| Some(p.distance_from_origin()))
-            .collect::<Vec<Option<f64>>>();
+            .collect::<Vec<Option<Point>>>();
             assert_eq!(result, expected);
     }
     #[test]
@@ -154,7 +157,7 @@ mod tests {
         let input = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
         let results = parallel_compute::parallel_compute(input, |x| {
-            if x == 5 {
+            if *x == 5 {
                 panic!("Panic on value 5");
             }
             x * 2
